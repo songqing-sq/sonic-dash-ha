@@ -1,0 +1,38 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# Cargo.toml lists `tonic-build` as a [build-dependencies] entry but the crate
+# ships no build.rs, so no cargo_build_script is needed here.
+rust_library(
+    name = "swbus_core",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "swbus_core",
+    edition = "2021",
+    proc_macro_deps = [
+        "@dash_ha_crates//:derivative",
+        "@dash_ha_crates//:getset",
+        "@dash_ha_crates//:atomic_enum",
+        "@dash_ha_crates//:contracts",
+    ],
+    deps = [
+        "//crates/swbus-proto:swbus_proto",
+        "//crates/swbus-config:swbus_config",
+        "@dash_ha_crates//:tokio",
+        "@dash_ha_crates//:tokio-util",
+        "@dash_ha_crates//:tokio-stream",
+        "@dash_ha_crates//:tonic",
+        "@dash_ha_crates//:prost",
+        "@dash_ha_crates//:tracing",
+        "@dash_ha_crates//:color-eyre",
+        "@dash_ha_crates//:strum",
+        "@dash_ha_crates//:dashmap",
+        "@dash_ha_crates//:serde",
+        "@dash_ha_crates//:serde_yaml",
+        "@dash_ha_crates//:tempfile",
+        "@dash_ha_crates//:serde_json",
+        "@dash_ha_crates//:futures-core",
+    ],
+)

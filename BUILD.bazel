@@ -1,0 +1,65 @@
+load("@sonic_build_infra//sonic_deb:sonic_deb.bzl", "sonic_deb")
+
+package(default_visibility = ["//visibility:public"])
+
+VERSION = "1.0.0"
+
+# crate_universe needs these visible so the root MODULE.bazel manifests entry
+# can read them.
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+])
+
+# Convenience aliases so callers can refer to the three release binaries
+# without knowing the per-crate package layout.
+alias(
+    name = "hamgrd",
+    actual = "//crates/hamgrd:hamgrd",
+)
+
+alias(
+    name = "swbusd",
+    actual = "//crates/swbusd:swbusd",
+)
+
+alias(
+    name = "swbus-cli",
+    actual = "//crates/swbus-cli:swbus-cli",
+)
+
+# debian/control declares Package: dash-ha containing the three Rust binaries
+# under /usr/bin (debian/install), plus scripts/wait_for_loopback.py. build-
+# depends include protobuf-compiler + libprotobuf-dev + libswsscommon-dev (used
+# at build time by the build.rs scripts) and runtime-depends on libswsscommon.
+#
+# DIVERGENCE FROM REFERENCE: our debian/install also installs
+# scripts/wait_for_loopback.py -> /usr/bin, which the reference sonic_deb omits.
+sonic_deb(
+    name = "dash-ha_{}.deb".format(VERSION),
+    package = "dash-ha",
+    version = VERSION,
+    content = {
+        "/usr/bin::0755": [
+            ":hamgrd",
+            ":swbusd",
+            ":swbus-cli",
+            "//scripts:wait_for_loopback.py",
+        ],
+    },
+    # Aligned with the Make baseline's dpkg-shlibdeps output (Rust binaries
+    # statically link libstd but at runtime dlopen glibc / libgcc_s and FFI
+    # into libswsscommon). Same approach as the in-repo
+    # sonic-supervisord-utilities-rs Rust migration. The upstream sonic-bazel
+    # reference only listed libswsscommon; Make emits all three, so we match Make.
+    depends = [
+        "libc6 (>= 2.34)",
+        "libgcc-s1 (>= 4.2)",
+        "libswsscommon (>= 1.0.0)",
+    ],
+    description = "HA control plane services for SONiC project.",
+    maintainer = "Riff Jiang <riffjiang@microsoft.com>",
+    section = "net",
+    gen_dbg = True,
+    visibility = ["//visibility:public"],
+)

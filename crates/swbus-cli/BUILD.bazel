@@ -1,0 +1,33 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# Cargo binary: target/release/swbus-cli -> /usr/bin/swbus-cli.
+rust_binary(
+    name = "swbus-cli",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "swbus_cli",
+    edition = "2021",
+    experimental_use_cc_common_link = 1,
+    deps = [
+        "//crates/swbus-edge:swbus_edge",
+        "//crates/swbus-core:swbus_core",
+        "//crates/swbus-proto:swbus_proto",
+        "//crates/swbus-config:swbus_config",
+        "//crates/swbus-actor:swbus_actor",
+        "@dash_ha_crates//:tokio",
+        "@dash_ha_crates//:tokio-stream",
+        "@dash_ha_crates//:tonic",
+        "@dash_ha_crates//:clap",
+        "@dash_ha_crates//:serde_yaml",
+        "@dash_ha_crates//:tabled",
+        "@dash_ha_crates//:anyhow",
+        "@dash_ha_crates//:uuid",
+        "@dash_ha_crates//:tracing",
+        "@dash_ha_crates//:tracing-subscriber",
+        "@dash_ha_crates//:serde_json",
+        "@dash_ha_crates//:chrono",
+    ],
+)

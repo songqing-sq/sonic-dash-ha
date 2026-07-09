@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+# debian/install ships scripts/wait_for_loopback.py -> /usr/bin. Export it so
+# the top-level sonic_deb can bundle it (DIVERGENCE FROM REFERENCE, which omits
+# this file).
+exports_files(["wait_for_loopback.py"])

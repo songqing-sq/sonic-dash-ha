@@ -1,0 +1,46 @@
+load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# build.rs runs prost-build over the proto files vendored in the
+# sonic-dash-api git submodule (crates/sonic-dash-api-proto/sonic-dash-api/
+# proto/*.proto), then post-processes OUT_DIR/dash.types.rs to add serde
+# derives on the Ip oneof. prost-build shells out to `protoc`, shipped by the
+# `protobuf` bazel_dep.
+cargo_build_script(
+    name = "sonic_dash_api_proto_build_script",
+    srcs = ["build.rs"],
+    edition = "2021",
+    build_script_env = {
+        "PROTOC": "$(execpath @protobuf//:protoc)",
+    },
+    data = glob(["sonic-dash-api/proto/**"]),
+    tools = ["@protobuf//:protoc"],
+    deps = [
+        "@dash_ha_crates//:prost-build",
+    ],
+)
+
+rust_library(
+    name = "sonic_dash_api_proto",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "sonic_dash_api_proto",
+    edition = "2021",
+    proc_macro_deps = [
+        "//crates/sonicdb-derive:sonicdb_derive",
+        "@dash_ha_crates//:strum_macros",
+    ],
+    deps = [
+        ":sonic_dash_api_proto_build_script",
+        "//crates/sonic-common:sonic_common",
+        "@dash_ha_crates//:swss-common",
+        "@dash_ha_crates//:prost",
+        "@dash_ha_crates//:serde",
+        "@dash_ha_crates//:serde_json",
+        "@dash_ha_crates//:hex",
+        "@dash_ha_crates//:strum",
+    ],
+)

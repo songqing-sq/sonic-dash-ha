@@ -1,0 +1,26 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+rust_library(
+    name = "swbus_edge",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "swbus_edge",
+    edition = "2021",
+    proc_macro_deps = [
+        "@dash_ha_crates//:contracts",
+    ],
+    deps = [
+        "//crates/swbus-proto:swbus_proto",
+        "@dash_ha_crates//:tokio",
+        "@dash_ha_crates//:tokio-stream",
+        "@dash_ha_crates//:tonic",
+        "@dash_ha_crates//:prost",
+        "@dash_ha_crates//:tracing",
+        "@dash_ha_crates//:strum",
+        "@dash_ha_crates//:dashmap",
+        "@dash_ha_crates//:thiserror",
+    ],
+)

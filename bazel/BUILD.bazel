@@ -1,0 +1,13 @@
+load(":libdir.bzl", "libclang_libdir")
+
+package(default_visibility = ["//visibility:public"])
+
+# Stage the libclang shared-library closure (provided by the reusable
+# @sonic-swss-common//bazel:extensions.bzl libclang extension, which downloads
+# from the official archive.ubuntu.com mirror) into one directory so bindgen
+# (run by swss-common's build.rs, compiled in-universe here) can dlopen it via
+# LIBCLANG_PATH / LD_LIBRARY_PATH.
+libclang_libdir(
+    name = "libclang_libs",
+    libs = "@swss_common_libclang//:libs",
+)

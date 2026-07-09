@@ -1,0 +1,41 @@
+load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# build.rs runs tonic-build over proto/swbus.proto. tonic-build shells out to
+# `protoc`, shipped by the `protobuf` bazel_dep.
+cargo_build_script(
+    name = "swbus_proto_build_script",
+    srcs = ["build.rs"],
+    edition = "2021",
+    build_script_env = {
+        "PROTOC": "$(execpath @protobuf//:protoc)",
+    },
+    data = glob(["proto/**"]),
+    tools = ["@protobuf//:protoc"],
+    deps = [
+        "@dash_ha_crates//:tonic-build",
+    ],
+)
+
+rust_library(
+    name = "swbus_proto",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "swbus_proto",
+    edition = "2021",
+    proc_macro_deps = [
+        "@dash_ha_crates//:contracts",
+    ],
+    deps = [
+        ":swbus_proto_build_script",
+        "@dash_ha_crates//:tonic",
+        "@dash_ha_crates//:prost",
+        "@dash_ha_crates//:strum",
+        "@dash_ha_crates//:thiserror",
+        "@dash_ha_crates//:serde",
+        "@dash_ha_crates//:serde_json",
+    ],
+)

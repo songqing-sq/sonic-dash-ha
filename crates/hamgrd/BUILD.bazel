@@ -1,0 +1,44 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# Cargo binary: target/release/hamgrd -> /usr/bin/hamgrd (debian/install).
+rust_binary(
+    name = "hamgrd",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "hamgrd",
+    edition = "2021",
+    # Link through the cc toolchain so the transitive C++ deps of swsscommon
+    # (libstdc++, hiredis, libzmq + versioned .so handling) link with correct
+    # ordering. The default rust linker emits version-stripped `-l` flags.
+    experimental_use_cc_common_link = 1,
+    proc_macro_deps = [
+        "//crates/sonicdb-derive:sonicdb_derive",
+    ],
+    deps = [
+        "//crates/swbus-edge:swbus_edge",
+        "//crates/swbus-actor:swbus_actor",
+        "//crates/swbus-config:swbus_config",
+        "//crates/swss-common-bridge:swss_common_bridge",
+        "//crates/swss-serde:swss_serde",
+        "//crates/sonic-common:sonic_common",
+        "//crates/sonic-dash-api-proto:sonic_dash_api_proto",
+        "@dash_ha_crates//:swss-common",
+        "@dash_ha_crates//:swss-common-testing",
+        "@dash_ha_crates//:tokio",
+        "@dash_ha_crates//:futures-util",
+        "@dash_ha_crates//:anyhow",
+        "@dash_ha_crates//:serde",
+        "@dash_ha_crates//:serde_with",
+        "@dash_ha_crates//:clap",
+        "@dash_ha_crates//:tracing",
+        "@dash_ha_crates//:chrono",
+        "@dash_ha_crates//:uuid",
+        "@dash_ha_crates//:prost",
+        "@dash_ha_crates//:hex",
+        "@dash_ha_crates//:lazy_static",
+        "@dash_ha_crates//:serde_json",
+    ],
+)

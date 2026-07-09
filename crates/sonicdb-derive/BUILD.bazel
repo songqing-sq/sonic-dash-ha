@@ -1,0 +1,20 @@
+load("@rules_rust//rust:defs.bzl", "rust_proc_macro")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# Proc-macro crate. It references swss_common:: / sonic_common:: only inside
+# the token streams it emits (via quote!), so those are NOT compile-time deps
+# of this crate itself -- only syn/quote/proc-macro2 are.
+rust_proc_macro(
+    name = "sonicdb_derive",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "sonicdb_derive",
+    edition = "2021",
+    deps = [
+        "@dash_ha_crates//:syn",
+        "@dash_ha_crates//:quote",
+        "@dash_ha_crates//:proc-macro2",
+    ],
+)

@@ -1,0 +1,37 @@
+load("@rules_rust//cargo:defs.bzl", "cargo_toml_env_vars")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# panic.rs uses env!("CARGO_PKG_REPOSITORY"/"CARGO_PKG_VERSION"/
+# "CARGO_PKG_AUTHORS"/"CARGO_PKG_HOMEPAGE"). Cargo sets these from Cargo.toml;
+# under Bazel we materialize them from the crate's (and workspace's) Cargo.toml
+# and feed them via rustc_env_files.
+cargo_toml_env_vars(
+    name = "cargo_env",
+    src = "Cargo.toml",
+    workspace = "//:Cargo.toml",
+)
+
+rust_library(
+    name = "sonic_common",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "sonic_common",
+    edition = "2021",
+    rustc_env_files = [":cargo_env"],
+    deps = [
+        "@dash_ha_crates//:swss-common",
+        "@dash_ha_crates//:tracing",
+        "@dash_ha_crates//:tracing-error",
+        "@dash_ha_crates//:tracing-subscriber",
+        "@dash_ha_crates//:syslog-tracing",
+        "@dash_ha_crates//:file-rotate",
+        "@dash_ha_crates//:better-panic",
+        "@dash_ha_crates//:human-panic",
+        "@dash_ha_crates//:signal-hook",
+        "@dash_ha_crates//:color-eyre",
+        "@dash_ha_crates//:lazy_static",
+    ],
+)

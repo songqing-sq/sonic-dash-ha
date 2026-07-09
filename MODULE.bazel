@@ -1,0 +1,105 @@
+module(
+    name = "sonic-dash-ha",
+    version = "1.0.0",
+)
+
+bazel_dep(name = "rules_rust", version = "0.61.0")
+bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "protobuf", version = "29.0")
+bazel_dep(name = "sonic-build-infra", version = "0.0.0", repo_name = "sonic_build_infra")
+bazel_dep(name = "sonic-swss-common", version = "1.0.0")
+
+# --- Rust crate universe ---
+# Unlike the upstream sonic-bazel reference (which vendored swss-common and
+# swss-common-testing as LOCAL workspace crates), in this tree swss-common is a
+# cross-module dependency provided by the already-migrated @sonic-swss-common
+# module. Cargo.toml declares it as a git dep (patch 0001 optionally rewrites it
+# to a `../sonic-swss-common` path dep for standalone `cargo build`); either way
+# crate_universe cannot compile it in this module's context (its build.rs runs
+# bindgen against the swsscommon C-API and it must share ONE serde/tokio
+# instance with the rest of the graph).
+#
+# The fix: resolve the WHOLE dependency closure with `from_cargo` (single crate
+# universe -> single serde, single tokio, so swss-common's CxxString: Serialize
+# matches the serde derives in dash-ha crates), then have crate_universe compile
+# swss-common / swss-common-testing IN this universe from their git source via
+# `crate.annotation(gen_build_script=...)`. NOTE: override_target_lib (the
+# sonic-swss/countersyncd approach) does NOT work here -- it links the rlib built
+# in @sonic-swss-common's separate universe, reintroducing the two-serde mismatch.
+# See mig_docs lessonlearned/sonic-dash-ha_lessonlearned.md #1.
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+crate.from_cargo(
+    name = "dash_ha_crates",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = [
+        "//:Cargo.toml",
+        "//crates/container:Cargo.toml",
+        "//crates/hamgrd:Cargo.toml",
+        "//crates/sonic-common:Cargo.toml",
+        "//crates/sonic-dash-api-proto:Cargo.toml",
+        "//crates/sonicdb-derive:Cargo.toml",
+        "//crates/swbus-actor:Cargo.toml",
+        "//crates/swbus-cli:Cargo.toml",
+        "//crates/swbus-config:Cargo.toml",
+        "//crates/swbus-core:Cargo.toml",
+        "//crates/swbus-edge:Cargo.toml",
+        "//crates/swbus-proto:Cargo.toml",
+        "//crates/swbusd:Cargo.toml",
+        "//crates/swss-common-bridge:Cargo.toml",
+        "//crates/swss-serde:Cargo.toml",
+    ],
+)
+
+# swss-common / swss-common-testing MUST be compiled IN this crate universe
+# (not linked from @sonic-swss-common's separate swss_common_crates universe):
+# their public types (e.g. CxxString) implement serde::Serialize, and that impl
+# is only compatible with dash-ha's serde derives if BOTH sides share the same
+# serde crate instance. Linking the foreign-universe rlib via override_target_lib
+# yields "trait bound CxxString: Serialize is not satisfied" (two serde types).
+#
+# So we let crate_universe build swss-common from its git source (as recorded in
+# Cargo.lock), and reproduce the bindgen build-script wiring that
+# @sonic-swss-common//crates/swss-common:swss_common uses:
+#   - SWSS_COMMON_REPO -> the sonic-swss-common module source (for c-api headers)
+#   - LIBCLANG_PATH / LD_LIBRARY_PATH -> the staged libclang closure
+#   - link the prebuilt libswsscommon C++ shared library
+crate.annotation(
+    crate = "swss-common",
+    repositories = ["dash_ha_crates"],
+    crate_features = ["async"],
+    gen_build_script = "on",
+    build_script_env = {
+        "SWSS_COMMON_REPO": "$${pwd}/external/sonic-swss-common+",
+        "LIBCLANG_PATH": "$(execpath @@sonic-dash-ha+//bazel:libclang_libs)",
+        "LD_LIBRARY_PATH": "$(execpath @@sonic-dash-ha+//bazel:libclang_libs)",
+        # arm64 cross: bindgen's LLVM-10 libclang otherwise resolves the host
+        # /usr/include/stdint.h and fails on the multiarch bits/libc-header-
+        # start.h. build.rs forwards --sysroot/-idirafter from CFLAGS but
+        # -idirafter is too low-priority to beat the host include dir. This
+        # target-suffixed var (bindgen appends it with precedence) forces the
+        # trixie aarch64 sysroot authoritatively. amd64 is unaffected (var is
+        # target-specific).
+        "BINDGEN_EXTRA_CLANG_ARGS_aarch64-unknown-linux-gnu": "--sysroot=$${pwd}/bazel-out/k8-opt/bin/external/rules_distroless++apt+sysroot-trixie/directory -isystem $${pwd}/bazel-out/k8-opt/bin/external/rules_distroless++apt+sysroot-trixie/directory/usr/include/aarch64-linux-gnu -isystem $${pwd}/bazel-out/k8-opt/bin/external/rules_distroless++apt+sysroot-trixie/directory/usr/include",
+    },
+    build_script_data = [
+        "@@sonic-dash-ha+//bazel:libclang_libs",
+        "@@sonic-swss-common+//:swsscommon_hdr_files",
+    ],
+    deps = [
+        "@@sonic-swss-common+//:swsscommon",
+    ],
+)
+crate.annotation(
+    crate = "swss-common-testing",
+    repositories = ["dash_ha_crates"],
+    gen_build_script = "off",
+)
+
+# Reusable libclang closure (downloads from the official archive.ubuntu.com
+# mirror). Defined in @sonic-swss-common for downstream bindgen consumers.
+libclang = use_extension("@sonic-swss-common//bazel:extensions.bzl", "libclang")
+use_repo(libclang, "swss_common_libclang")
+
+use_repo(crate, "dash_ha_crates")

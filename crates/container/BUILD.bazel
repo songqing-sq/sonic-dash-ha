@@ -1,0 +1,27 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# The container helper is a workspace member built by `cargo build --all` but
+# is NOT installed by debian/install. Exposed here so the workspace graph is
+# complete; the top-level dash-ha deb does not bundle it.
+rust_binary(
+    name = "container",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "container",
+    edition = "2021",
+    experimental_use_cc_common_link = 1,
+    deps = [
+        "@dash_ha_crates//:swss-common",
+        "@dash_ha_crates//:bollard",
+        "@dash_ha_crates//:chrono",
+        "@dash_ha_crates//:enumset",
+        "@dash_ha_crates//:futures-util",
+        "@dash_ha_crates//:clap",
+        "@dash_ha_crates//:tokio",
+        "@dash_ha_crates//:serde_json",
+        "@dash_ha_crates//:thiserror",
+    ],
+)

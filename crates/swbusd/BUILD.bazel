@@ -1,0 +1,24 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["Cargo.toml"])
+
+# Cargo binary: target/release/swbusd -> /usr/bin/swbusd.
+rust_binary(
+    name = "swbusd",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "swbusd",
+    edition = "2021",
+    experimental_use_cc_common_link = 1,
+    deps = [
+        "//crates/swbus-core:swbus_core",
+        "//crates/swbus-config:swbus_config",
+        "//crates/sonic-common:sonic_common",
+        "@dash_ha_crates//:tokio",
+        "@dash_ha_crates//:tokio-stream",
+        "@dash_ha_crates//:tonic",
+        "@dash_ha_crates//:tracing",
+        "@dash_ha_crates//:clap",
+    ],
+)
