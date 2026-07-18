@@ -1,6 +1,51 @@
+load("@rules_cc//cc:cc_import.bzl", "cc_import")
 load(":libdir.bzl", "libclang_libdir")
 
 package(default_visibility = ["//visibility:public"])
+
+# --- Dynamic libswsscommon for the Rust crates ---
+# The swss-common Rust crate's build.rs emits `cargo:rustc-link-lib=dylib=
+# swsscommon`, i.e. it WANTS to dynamically link libswsscommon (exactly like the
+# Make build, which links against libswsscommon-dev's /usr/lib/.../libswsscommon.so
+# and ends up with NEEDED libswsscommon.so.0). If we instead feed the crate the
+# static cc_library @sonic-swss-common//:swsscommon, rules_rust embeds the whole
+# libswsscommon .a into every binary, which also drags libswsscommon's entire C
+# dependency closure (boost/hiredis/zmq/krb5/pcre2/...) into each binary's own
+# NEEDED list and exports the swsscommon C-API + boost symbols. That diverges
+# from the Make artifact.
+#
+# rust_binary cannot consume a cc_shared_library via dynamic_deps, so we bridge
+# with a cc_import. We copy the versioned shared object (its embedded SONAME is
+# libswsscommon.so.0) to a plain `libswsscommon.so` name so the linker's
+# `-lswsscommon` resolves to it and records a single NEEDED libswsscommon.so.0.
+# The transitive C deps stay hidden inside libswsscommon.so (resolved at runtime
+# via its own DT_NEEDED), matching Make.
+genrule(
+    name = "libswsscommon_so",
+    srcs = ["@sonic-swss-common//:swsscommon_shared"],
+    outs = ["libswsscommon.so"],
+    cmd = "cp -L $(location @sonic-swss-common//:swsscommon_shared) $@",
+)
+
+cc_import(
+    name = "swsscommon_so_import",
+    shared_library = ":libswsscommon.so",
+)
+
+# libswsscommon.so has undefined references to its own C dependencies
+# (boost/zmq/libnl/libyang/hiredis) that are resolved at RUNTIME via its
+# DT_NEEDED chain, not at link time. Without --allow-shlib-undefined, ld errors
+# out when a downstream binary links the .so ("undefined reference to
+# boost::archive::...", "zmq_msg_close", "nlmsg_hdr@libnl_3", ...). The
+# cc_library wrapper propagates this linkopt into the Rust binaries' final link.
+cc_library(
+    name = "swsscommon_dynamic",
+    deps = [":swsscommon_so_import"],
+    linkopts = [
+        "-Wl,--as-needed",
+        "-Wl,--allow-shlib-undefined",
+    ],
+)
 
 # Stage the libclang shared-library closure (provided by the reusable
 # @sonic-swss-common//bazel:extensions.bzl libclang extension, which downloads

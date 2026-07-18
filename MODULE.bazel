@@ -64,7 +64,10 @@ crate.from_cargo(
 # @sonic-swss-common//crates/swss-common:swss_common uses:
 #   - SWSS_COMMON_REPO -> the sonic-swss-common module source (for c-api headers)
 #   - LIBCLANG_PATH / LD_LIBRARY_PATH -> the staged libclang closure
-#   - link the prebuilt libswsscommon C++ shared library
+#   - dynamically link libswsscommon.so via the //bazel:swsscommon_dynamic
+#     cc_import (build.rs already requests dylib=swsscommon), so the binaries get
+#     NEEDED libswsscommon.so.0 and do NOT statically embed libswsscommon or leak
+#     its C-dep closure -- matching the Make artifact.
 crate.annotation(
     crate = "swss-common",
     repositories = ["dash_ha_crates"],
@@ -88,7 +91,7 @@ crate.annotation(
         "@@sonic-swss-common+//:swsscommon_hdr_files",
     ],
     deps = [
-        "@@sonic-swss-common+//:swsscommon",
+        "@@sonic-dash-ha+//bazel:swsscommon_dynamic",
     ],
 )
 crate.annotation(
